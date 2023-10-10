@@ -120,8 +120,13 @@ def OptimalsimpleItteration(x, y, step_x, step_y, iter, tau):
     current_U = fillBorderMatrix(x, y)
     U_0 = np.copy(previous_U)
     arrayOfU_K = [U_0]
-
-    while k < iter:
+    exact = exactSolition(x, y)
+    while (
+        k
+        < iter
+        # normOfMatrix(current_U - exact) / normOfMatrix(U_0 - exact)
+        # > EPS
+    ):
         for i in range(1, len(x) - 1):
             for j in range(1, len(y) - 1):
                 delta_x_sq = step_x**2

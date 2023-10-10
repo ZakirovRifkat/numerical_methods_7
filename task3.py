@@ -11,7 +11,7 @@ def spectralRadiusApprox(xi):
 
 
 def itterationApprox(ksi):
-    return np.log(1 / EPS) / (2 * ksi)
+    return np.log(1 / EPS) / (4 * ksi)
 
 
 def q(x, y):
@@ -104,27 +104,49 @@ def calculate_lhu(u, x, y, hx, hy):
     return lhu
 
 
-def simpleItteration(x, y, step_x, step_y, iter):
+def tau(c1, c2, d1, d2, step_x, step_y):
+    sigma = c1 * (4 / (step_x**2)) * ((np.sin((np.pi * step_x) / 2)) ** 2) + d1 * (
+        4 / (step_y**2)
+    ) * ((np.sin((np.pi * step_y) / (2 * np.pi))) ** 2)
+    delta = c2 * (4 / (step_x**2)) * ((np.cos((np.pi * step_x) / 2)) ** 2) + d2 * (
+        4 / (step_y**2)
+    ) * ((np.cos((np.pi * step_y) / (2 * np.pi))) ** 2)
+    return 2 / (delta + sigma)
+
+
+def Zeydel(x, y, step_x, step_y, iter):
     k = 0
     previous_U = fillBorderMatrix(x, y)
     current_U = fillBorderMatrix(x, y)
     U_0 = np.copy(previous_U)
     arrayOfU_K = [U_0]
+    exact = exactSolition(x, y)
 
-    while k < iter:
+    while (
+        k
+        < iter
+        # normOfMatrix(current_U - exact) / normOfMatrix(U_0 - exact)
+        # > EPS
+    ):
         for i in range(1, len(x) - 1):
             for j in range(1, len(y) - 1):
-                a = (p(x[i] - step_x / 2, y[j]) * previous_U[i - 1][j]) / step_x**2
-                b = (p(x[i] + step_x / 2, y[j]) * previous_U[i + 1][j]) / step_x**2
-                c = (q(x[i], y[j] - step_y / 2) * previous_U[i][j - 1]) / step_y**2
-                d = (q(x[i], y[j] + step_y / 2) * previous_U[i][j + 1]) / step_y**2
-                a_denom = (p(x[i] - step_x / 2, y[j])) / step_x**2
-                b_denom = (p(x[i] + step_x / 2, y[j])) / step_x**2
-                c_denom = (q(x[i], y[j] - step_y / 2)) / step_y**2
-                d_denom = (q(x[i], y[j] + step_y / 2)) / step_y**2
-                current_U[i][j] = (a + b + c + d + f(x[i], y[j])) / (
-                    a_denom + b_denom + c_denom + d_denom
+                delta_x_sq = step_x**2
+                delta_y_sq = step_y**2
+
+                term1 = (p(x[i] - step_x / 2, y[j]) * current_U[i - 1][j]) / delta_x_sq
+                term2 = (p(x[i] + step_x / 2, y[j]) * previous_U[i + 1][j]) / delta_x_sq
+                term3 = (q(x[i], y[j] - step_y / 2) * current_U[i][j - 1]) / delta_y_sq
+                term4 = (q(x[i], y[j] + step_y / 2) * previous_U[i][j + 1]) / delta_y_sq
+                term5 = f(x[i], y[j])
+
+                denominator = (
+                    (p(x[i] - step_x / 2, y[j]) / delta_x_sq)
+                    + (p(x[i] + step_x / 2, y[j]) / delta_x_sq)
+                    + (q(x[i], y[j] - step_y / 2) / delta_y_sq)
+                    + (q(x[i], y[j] + step_y / 2) / delta_y_sq)
                 )
+
+                current_U[i][j] = (term1 + term2 + term3 + term4 + term5) / denominator
         k += 1
 
         previous_U = np.copy(current_U)
@@ -156,7 +178,7 @@ U_0 = fillBorderMatrix(x_i, y_i)
 print("\nМетод простых иттераций. Вариант 8\n")
 print(f"N = {N}; M = {M}\neps = {EPS}\n")
 print(
-    f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) +f_matrix)}"
+    f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) - f_matrix)}"
 )
 null_approx = normOfMatrix(calculate_lhu(U_0, x_i, y_i, step_x, step_y) + f_matrix)
 print(f"Норма невязки нулевого приближения ||F-AU_0|| = {null_approx}")
@@ -164,7 +186,7 @@ print(f"Число иттераций = {itterationApprox(ksi)}")
 spectr = spectralRadiusApprox(ksi)
 print(f"Спектральный радиус pho(H)= {spectr}")
 
-array_simple_itteration_matrix, amountItter = simpleItteration(
+array_simple_itteration_matrix, amountItter = Zeydel(
     x_i, y_i, step_x, step_y, itterationApprox(ksi)
 )
 approx_solition_table = tabulate(
