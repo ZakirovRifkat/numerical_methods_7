@@ -110,8 +110,12 @@ def simpleItteration(x, y, step_x, step_y, iter):
     current_U = fillBorderMatrix(x, y)
     U_0 = np.copy(previous_U)
     arrayOfU_K = [U_0]
-
-    while k < iter:
+    exact = exactSolition(x, y)
+    while (
+        # k < iter
+          normOfMatrix(current_U - exact) / normOfMatrix(U_0 - exact)
+        > EPS
+           ):
         for i in range(1, len(x) - 1):
             for j in range(1, len(y) - 1):
                 a = (p(x[i] - step_x / 2, y[j]) * previous_U[i - 1][j]) / step_x**2
@@ -136,8 +140,8 @@ x_0 = 0
 x_n = 1
 y_0 = 0
 y_m = np.pi
-N = 5
-M = 15
+N = 15
+M = 45
 step_x = (x_n) / N
 step_y = (y_m) / M
 x_i = np.arange(x_0, x_n + step_x, step_x)
@@ -156,7 +160,7 @@ U_0 = fillBorderMatrix(x_i, y_i)
 print("\nМетод простых иттераций. Вариант 8\n")
 print(f"N = {N}; M = {M}\neps = {EPS}\n")
 print(
-    f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) +f_matrix)}"
+    f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) + f_matrix)}"
 )
 null_approx = normOfMatrix(calculate_lhu(U_0, x_i, y_i, step_x, step_y) + f_matrix)
 print(f"Норма невязки нулевого приближения ||F-AU_0|| = {null_approx}")

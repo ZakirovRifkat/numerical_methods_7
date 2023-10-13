@@ -11,7 +11,11 @@ def spectralRadiusApprox(xi):
 
 
 def itterationApprox(ksi):
-    return np.log(1 / EPS) / (2 * ksi)
+    return np.log(2 / EPS) / 2 * np.sqrt(ksi)
+
+
+def omegaOpt(spec):
+    return 2 / (1 + np.sqrt(1 - spec**2))
 
 
 def q(x, y):
@@ -104,25 +108,43 @@ def calculate_lhu(u, x, y, hx, hy):
     return lhu
 
 
-def tau(c1, c2, d1, d2, step_x, step_y):
-    sigma = c1 * (4 / (step_x**2)) * ((np.sin((np.pi * step_x) / 2)) ** 2) + d1 * (
+def sigma_cheb(c1, c2, d1, d2, step_x, step_y):
+    return c1 * (4 / (step_x**2)) * ((np.sin((np.pi * step_x) / 2)) ** 2) + d1 * (
         4 / (step_y**2)
     ) * ((np.sin((np.pi * step_y) / (2 * np.pi))) ** 2)
-    delta = c2 * (4 / (step_x**2)) * ((np.cos((np.pi * step_x) / 2)) ** 2) + d2 * (
+
+
+def delta_cheb(c1, c2, d1, d2, step_x, step_y):
+    return c2 * (4 / (step_x**2)) * ((np.cos((np.pi * step_x) / 2)) ** 2) + d2 * (
         4 / (step_y**2)
     ) * ((np.cos((np.pi * step_y) / (2 * np.pi))) ** 2)
-    return 2 / (delta + sigma)
 
 
-def OptimalsimpleItteration(x, y, step_x, step_y, iter, tau):
+def tau(sigma, delta, k):
+    # teta = [1, 31, 15, 17, 7, 25, 9, 23, 3, 29, 13, 19, 5, 27, 11, 21]
+    # teta = [1, 3]
+    teta = [1, 15, 7, 9, 3, 13, 5, 11]
+    n = 8
+    tau_k = []
+    for i in range(len(teta)):
+        term = np.cos(((teta[i] * np.pi) / (2 * n)))
+        tau_k.append(2 / (delta + sigma + (delta - sigma) * term))
+    print(tau_k)
+    return tau_k
+
+
+def Cheba(x, y, step_x, step_y, iter, tau_k):
     k = 0
     previous_U = fillBorderMatrix(x, y)
     current_U = fillBorderMatrix(x, y)
     U_0 = np.copy(previous_U)
     arrayOfU_K = [U_0]
     exact = exactSolition(x, y)
+
     while (
         # k < iter
+        # k
+        # < 32
         normOfMatrix(current_U - exact) / normOfMatrix(U_0 - exact)
         > EPS
     ):
@@ -134,27 +156,27 @@ def OptimalsimpleItteration(x, y, step_x, step_y, iter, tau):
                 term1 = (
                     p(x[i] + step_x / 2, y[j])
                     * (previous_U[i + 1][j] - previous_U[i][j])
-                    / delta_x_sq
-                )
+                ) / delta_x_sq
+
                 term2 = (
                     p(x[i] - step_x / 2, y[j])
                     * (previous_U[i][j] - previous_U[i - 1][j])
-                    / delta_x_sq
-                )
+                ) / delta_x_sq
+
                 term3 = (
                     q(x[i], y[j] + step_y / 2)
                     * (previous_U[i][j + 1] - previous_U[i][j])
-                    / delta_y_sq
-                )
+                ) / delta_y_sq
+
                 term4 = (
                     q(x[i], y[j] - step_y / 2)
                     * (previous_U[i][j] - previous_U[i][j - 1])
-                    / delta_y_sq
-                )
+                ) / delta_y_sq
+
                 term5 = f(x[i], y[j])
 
-                current_U[i][j] = previous_U[i][j] + tau * (
-                    term1 - term2 + term3 - term4 + term5
+                current_U[i][j] = previous_U[i][j] + (
+                    tau_k[k % 8] * (term1 - term2 + term3 - term4 + term5)
                 )
         k += 1
 
@@ -187,7 +209,7 @@ U_0 = fillBorderMatrix(x_i, y_i)
 print("\nМетод простых иттераций. Вариант 8\n")
 print(f"N = {N}; M = {M}\neps = {EPS}\n")
 print(
-    f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) +f_matrix)}"
+    f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) - f_matrix)}"
 )
 null_approx = normOfMatrix(calculate_lhu(U_0, x_i, y_i, step_x, step_y) + f_matrix)
 print(f"Норма невязки нулевого приближения ||F-AU_0|| = {null_approx}")
@@ -195,8 +217,16 @@ print(f"Число иттераций = {itterationApprox(ksi)}")
 spectr = spectralRadiusApprox(ksi)
 print(f"Спектральный радиус pho(H)= {spectr}")
 
-array_simple_itteration_matrix, amountItter = OptimalsimpleItteration(
-    x_i, y_i, step_x, step_y, itterationApprox(ksi), tau(c1, c2, d1, d2, step_x, step_y)
+sig = sigma_cheb(c1, c2, d1, d2, step_x, step_y)
+delt = delta_cheb(c1, c2, d1, d2, step_x, step_y)
+
+array_simple_itteration_matrix, amountItter = Cheba(
+    x_i,
+    y_i,
+    step_x,
+    step_y,
+    itterationApprox(ksi),
+    tau(sig, delt, itterationApprox(ksi)),
 )
 approx_solition_table = tabulate(
     array_simple_itteration_matrix[-1], tablefmt="fancy_grid"
@@ -243,5 +273,5 @@ table1 = tabulate(data, headers, tablefmt="grid")
 
 
 print(table1)
-print(f"\nПриближенное решение:\n{approx_solition_table}")
-print(f"\nТочное решение:\n{exact_solution_table}")
+# print(f"\nПриближенное решение:\n{approx_solition_table}")
+# print(f"\nТочное решение:\n{exact_solution_table}")
