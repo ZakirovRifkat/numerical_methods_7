@@ -116,7 +116,8 @@ def triangle(x, y, h_x, h_y, omega, f_h, tau):
     while (
         # k
         # < 32
-        normOfMatrix(current_U - exact) / normOfMatrix(U_0 - exact) > EPS
+        normOfMatrix(current_U - exact) / normOfMatrix(U_0 - exact)
+        > EPS
     ):
         lower_w = np.zeros((len(x), len(y)))
         upper_w = np.zeros((len(x), len(y)))

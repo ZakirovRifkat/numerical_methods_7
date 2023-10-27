@@ -2,29 +2,40 @@ import numpy as np
 from tabulate import tabulate
 
 np.set_printoptions(formatter={"all": lambda x: f"{x:.4f}"})  # Set the format
-EPS = 0.001
+EPS = 0.1
+
+
+def calculate_lhu(u, x, y, hx, hy):
+    lhu = np.zeros((len(x), len(y)))
+    for i in range(1, len(x) - 1):
+        for j in range(1, len(y) - 1):
+            term1 = (p(x[i] + hx / 2, y[j]) * (u[i + 1][j] - u[i][j])) / hx**2
+            term2 = (p(x[i] - hx / 2, y[j]) * (u[i][j] - u[i - 1][j])) / hx**2
+            term3 = (q(x[i], y[j] + hy / 2) * (u[i][j + 1] - u[i][j])) / hy**2
+            term4 = (q(x[i], y[j] - hy / 2) * (u[i][j] - u[i][j - 1])) / hy**2
+            lhu[i][j] = term1 - term2 + term3 - term4
+    return lhu
 
 
 def tridiagonal_matrix_algorithm(a, b, c, d):
-    n = len(d)
-    c_new = np.zeros(n - 1)
-    d_new = np.zeros(n)
+    n = len(b)
+    alpha = [0] * n
+    beta = [0] * n
+    x = [0] * n
 
-    # Прямой ход (прогонка вперед)
-    c_new[0] = c[0] / b[0]
-    d_new[0] = d[0] / b[0]
+    # Прямой ход (forward pass)
+    alpha[0] = b[0]
+    beta[0] = d[0] / alpha[0]
 
-    for i in range(1, n - 1):
-        temp = b[i] - a[i] * c_new[i - 1]
-        c_new[i] = c[i] / temp
-        d_new[i] = (d[i] - a[i] * d_new[i - 1]) / temp
+    for i in range(1, n):
+        alpha[i] = b[i] - a[i] * c[i - 1] / alpha[i - 1]
+        beta[i] = (d[i] - a[i] * beta[i - 1]) / alpha[i]
 
-    # Обратный ход (прогонка назад)
-    x = np.zeros(n)
-    x[-1] = d_new[-1]
+    # Обратный ход (backward pass)
+    x[n - 1] = beta[n - 1]
 
     for i in range(n - 2, -1, -1):
-        x[i] = d_new[i] - c_new[i] * x[i + 1]
+        x[i] = beta[i] - c[i] * x[i + 1] / alpha[i]
 
     return x
 
@@ -33,23 +44,35 @@ def q(x, y):
     return 1
 
 
+# def p(x, y):
+#     return 1 + 2 * x
+
+
+# def f(x, y):
+#     return -1 * (
+#         2 * y**2
+#         + 2 * y**3
+#         + 8 * x * y**2
+#         + 8 * x * y**3
+#         + 2 * x**2
+#         + 6 * x**2 * y
+#     )
+
+
+# def mu(x, y):
+#     return x**2 * y**2 + x**2 * y**3
+
+
 def p(x, y):
-    return 1 + 2 * x
+    return 3 * x + 2
 
 
 def f(x, y):
-    return -1 * (
-        2 * y**2
-        + 2 * y**3
-        + 8 * x * y**2
-        + 8 * x * y**3
-        + 2 * x**2
-        + 6 * x**2 * y
-    )
+    return -1 * x**2 * (2 + 6 * y) - y**2 * (12 * x + 4) * (1 + y)
 
 
 def mu(x, y):
-    return x**2 * y**2 + x**2 * y**3
+    return x**2 * y**2 * (1 + y)
 
 
 def fillBorderMatrix(x_i, y_i):
@@ -96,85 +119,132 @@ def f_matrix(x_i, y_i):
     return matrix
 
 
-def terms_1(x, y, j, u, tau, hx, hy):
-    term1 = []
-    term2 = []
-    term3 = []
-    term4 = []
-    for i in range(len(x)):
-        term1.append((-1 * p(x[i] - hx / 2, y[j])) / (hx**2))
-        term2.append(
-            (
-                2 / tau
-                + p(x[i] + hx / 2, y[j]) / hx**2
-                + p(x[i] - hx / 2, y[j]) / hx**2
-            )
-        )
-        term3.append((-1 * p(x[i] + hx / 2, y[j])) / (hx**2))
-        g = (
-            (2 * u[i][j]) / tau
-            + (q(x[i], y[j] + hy / 2) * (u[i][j + 1] - u[i][j])) / hy**2
-            - (q(x[i], y[j] - hy / 2) * (u[i][j] - u[i][j - 1])) / hy**2
-            + f(x[i], y[i])
-        )
-        term4.append(g)
-    return term1, term2, term3, term4
+# Коэффициенты первой системы
+def A_1(x, y, i, j, hx):
+    return (-1 * p(x[i] - (hx / 2), y[j])) / hx**2
 
 
-def terms_2(x, y, j, u, tau, hx, hy):
-    term1 = []
-    term2 = []
-    term3 = []
-    term4 = []
-    for i in range(len(x)):
-        term1.append((-1 * q(x[i], y[j] - hy / 2)) / hy**2)
-        term2.append(
-            (
-                2 / tau
-                + q(x[i], y[j] + hy / 2) / hy**2
-                + q(x[i], y[j] - hy / 2) / hy**2
-            )
-        )
-        term3.append((-1 * p(x[i], y[j] + hy / 2)) / (hy**2))
-        g = (
-            (2 * u[i][j]) / tau
-            + (p(x[i] + hx / 2, y[j]) * (u[i + 1][j] - u[i][j])) / hx**2
-            - (p(x[i] - hx / 2, y[j]) * (u[i][j] - u[i - 1][j])) / hx**2
-            + f(x[i], y[i])
-        )
-        term4.append(g)
-    return term1, term2, term3, term4
+def B_1(x, y, i, j, hx, tau):
+    term1 = 2 / tau
+    term2 = p(x[i] + (hx / 2), y[j]) / hx**2
+    term3 = p(x[i] - (hx / 2), y[j]) / hx**2
+    return term1 + term2 + term3
+
+
+def C_1(x, y, i, j, hx):
+    return (-1 * p(x[i] + (hx / 2), y[j])) / hx**2
+
+
+def G_1(x, y, i, j, hy, tau, u):
+    term1 = (2 * u[i][j]) / tau
+    term2 = (q(x[i], y[j] + (hy / 2)) * (u[i][j + 1] - u[i][j])) / hy**2
+    term3 = (q(x[i], y[j] - (hy / 2)) * (u[i][j] - u[i][j - 1])) / hy**2
+    term4 = f(x[i], y[j])
+    return term1 + term2 - term3 + term4
+
+
+# Коэффициенты второй системы
+def A_2(x, y, i, j, hy):
+    return (-1 * q(x[i], y[j] - (hy / 2))) / hy**2
+
+
+def B_2(x, y, i, j, hy, tau):
+    term1 = 2 / tau
+    term2 = q(x[i], y[j] + (hy / 2)) / hy**2
+    term3 = q(x[i], y[j] - (hy / 2)) / hy**2
+    return term1 + term2 + term3
+
+
+def C_2(x, y, i, j, hy):
+    return (-1 * q(x[i], y[j] + (hy / 2))) / hy**2
+
+
+def G_2(x, y, i, j, hx, tau, u):
+    term1 = (2 * u[i][j]) / tau
+    term2 = (p(x[i] + (hx / 2), y[j]) * (u[i + 1][j] - u[i][j])) / hx**2
+    term3 = (p(x[i] - (hx / 2), y[j]) * (u[i][j] - u[i - 1][j])) / hx**2
+    term4 = f(x[i], y[j])
+    return term1 + term2 - term3 + term4
 
 
 def alternatingDirectionMethod(x, y, hx, hy, tau):
     k = 0
+    exact = exactSolition(x, y)
     previous_U = fillBorderMatrix(x, y)
-    current_U = fillBorderMatrix(x, y)
+
     U_0 = np.copy(previous_U)
     arrayOfU_K = [U_0]
-    exact = exactSolition(x, y)
-    # while (normOfMatrix(current_U - exact) / normOfMatrix(U_0 - exact) > EPS): #k<32
-    #     print(1)
-    u_half = np.zeros((len(y), len(x)))
-    for i in range(1, len(x) - 1):
-        # if j == 0:
-        #     for i in range(len(x)):
-        #         u_half[j][i] = mu(x[i], 0)
-        # elif j == len(y):
-        #     for i in range(len(x)):
-        #         u_half[j][i] = mu(x[i], np.pi)
-        # else:
-        term1, term2, term3, term4 = terms_1(x, y, i, previous_U, tau, hx, hy)
-        u_half[j] = tridiagonal_matrix_algorithm(term1, term2, term3, term4)
-    print(u_half)
-    return 0
+
+    while (
+        k
+        < 100
+        # (normOfMatrix(arrayOfU_K[k] - exact) / normOfMatrix(arrayOfU_K[0] - exact))
+        # > EPS
+    ):
+        u_half = np.zeros((len(x), len(y)))
+        current_U = np.zeros((len(x), len(y)))
+
+        print(normOfMatrix(arrayOfU_K[k] - exact) / normOfMatrix(arrayOfU_K[0] - exact))
+
+        for i in range(len(x)):  # Условие на крайних столбцах
+            u_half[i][0] = mu(x[i], 0)
+            u_half[i][len(y) - 1] = mu(x[i], y[len(y) - 1])
+        # np.savetxt("matrix.txt", u_half, fmt="%.08f", delimiter="\t")
+
+        for j in range(1, len(y) - 1):
+            u_half[0][j] = mu(0, y[j])  # Условие на крайних строках
+            u_half[len(x) - 1][j] = mu(x[len(x) - 1], y[j])
+
+            term1 = []
+            term2 = []
+            term3 = []
+            term4 = []
+            for i in range(1, len(x) - 1):
+                term1.append(A_1(x, y, i, j, hx))
+                term2.append(B_1(x, y, i, j, hx, tau))
+                term3.append(C_1(x, y, i, j, hx))
+                term4.append(G_1(x, y, i, j, hy, tau, arrayOfU_K[k]))
+            linear_solve = tridiagonal_matrix_algorithm(term1, term2, term3, term4)
+            for i in range(1, len(x) - 1):
+                u_half[i][j] = linear_solve[i - 1]
+            # Построили половинный шаг
+
+        for j in range(len(y)):
+            current_U[0][j] = mu(0, y[j])
+            current_U[len(x) - 1][j] = mu(x[len(x) - 1], y[j])
+
+        for i in range(1, len(x) - 1):
+            current_U[i][0] = mu(x[i], 0)
+            current_U[i][len(y) - 1] = mu(x[i], y[len(y) - 1])
+
+            lterm1 = []
+            lterm2 = []
+            lterm3 = []
+            lterm4 = []
+            for j in range(1, len(y) - 1):
+                lterm1.append(A_2(x, y, i, j, hy))
+                lterm2.append(B_2(x, y, i, j, hy, tau))
+                lterm3.append(C_2(x, y, i, j, hy))
+                lterm4.append(G_2(x, y, i, j, hx, tau, u_half))
+            linear_solve2 = tridiagonal_matrix_algorithm(lterm1, lterm2, lterm3, lterm4)
+
+            for j in range(1, len(y) - 1):
+                current_U[i][j] = linear_solve2[j - 1]
+                # Построили k+1 решение
+            # np.savetxt("matrix.txt", current_U, fmt="%.08f", delimiter="\t")
+
+        arrayOfU_K.append(np.copy(current_U))
+        k += 1
+        print(k)
+    return arrayOfU_K
 
 
 x_0 = 0
 x_n = 1
 
 y_0 = 0
-y_m = np.pi
+# y_m = np.pi
+y_m = 1
 
 N = 5
 M = 15
@@ -185,19 +255,90 @@ step_y = (y_m) / M
 x_i = np.arange(x_0, x_n + step_x, step_x)
 y_i = np.arange(y_0, y_m + step_y, step_y)
 
-c1 = 1
-c2 = 3
+# c1 = 1
+# c2 = 3
+c1 = 2
+c2 = 5
+
 d1 = 1
 d2 = 1
 
-sigma_1 = c1 * (4 / (step_x**2)) * ((np.sin((np.pi * step_x) / 2 * 1)) ** 2)
-sigma_2 = c2 * (4 / step_x**2) * ((np.cos((np.pi * step_x) / 2 * 1)) ** 2)
+sigma_1 = (
+    c1 * (4 / (step_x**2)) * ((np.sin((np.pi * step_x) / 2 * x_i[len(x_i) - 1])) ** 2)
+)
+delta_1 = (
+    c2 * (4 / (step_x**2)) * ((np.cos((np.pi * step_x) / 2 * x_i[len(x_i) - 1])) ** 2)
+)
 
-delta_1 = c2 * (4 / (step_y**2)) * ((np.sin((np.pi * step_y) / (2 * np.pi))) ** 2)
-delta_2 = c2 * (4 / (step_y**2)) * ((np.cos((np.pi * step_y) / (2 * np.pi))) ** 2)
+sigma_2 = (
+    d1
+    * (4 / (step_y**2))
+    * ((np.sin((np.pi * step_y) / (2 * y_i[len(y_i) - 1]))) ** 2)
+)
+delta_2 = (
+    d2
+    * (4 / (step_y**2))
+    * ((np.cos((np.pi * step_y) / (2 * y_i[len(y_i) - 1]))) ** 2)
+)
 
-sigma = max([sigma_1, sigma_2])
+sigma = min([sigma_1, sigma_2])
 delta = max([delta_1, delta_2])
 
 tauOpt = 2 / (np.sqrt(sigma * delta))
-alternatingDirectionMethod(x_i, y_i, step_x, step_y, tauOpt)
+
+f_h = f_matrix(x_i, y_i)
+exact_solve = exactSolition(x_i, y_i)
+exact_solution_table = tabulate(exact_solve, tablefmt="fancy_grid")
+
+array_triangle = alternatingDirectionMethod(x_i, y_i, step_x, step_y, tauOpt)
+
+np.savetxt("ex.txt", exact_solve, fmt="%.08f", delimiter="\t")
+# U_0_111 = fillBorderMatrix(x_i, y_i)
+# null_approx = normOfMatrix(calculate_lhu(U_0, x_i, y_i, step_x, step_y) + f_h)
+
+
+# data = []
+# headers = [
+#     "k",
+#     "||F-AU_k||",
+#     "rel.d",
+#     "||U^k - U_*||",
+#     "rel.error",
+#     "||U^k - U^(k-1)||",
+#     # "apost.est",
+#     "sp.red._k",
+# ]
+
+# for k, solve in enumerate(array_triangle):
+#     data.append(
+#         [
+#             k,
+#             normOfMatrix(calculate_lhu(solve, x_i, y_i, step_x, step_y) + f_h),
+#             normOfMatrix(calculate_lhu(solve, x_i, y_i, step_x, step_y) + f_h)
+#             / null_approx,
+#             normOfMatrix(solve - exact_solve),
+#             normOfMatrix(solve - exact_solve) / normOfMatrix(U_0 - exact_solve),
+#             normOfMatrix(solve - array_triangle[k - 1]),
+#             # (spectr * normOfMatrix(solve - array_triangle[k - 1])) / (1 - spectr),
+#             normOfMatrix(solve - array_triangle[k - 1])
+#             / normOfMatrix(array_triangle[k - 1] - array_triangle[k - 2]),
+#         ]
+#     )
+
+# # Выведите таблицу
+# table1 = tabulate(data, headers, tablefmt="grid")
+
+# print(
+#     "\nПопеременно треугольный итерационный метод с чебышевскими параметрами. Вариант 8\n"
+# )
+# print(f"N = {N}; M = {M}\neps = {EPS}\n")
+# print(
+#     f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) + f_h)}"
+# )
+# print(f"Норма невязки нулевого приближения ||F-AU_0|| = {null_approx}")
+# # print(f"Число иттераций = {itterationApprox(eta)}")
+
+# # print(f"Спектральный радиус pho(H)= {spectr}")
+# print(table1)
+# # print(f"\nПриближенное решение:\n{approx_solition_table}")
+# # print(f"\nТочное решение:\n{exact_solution_table}")

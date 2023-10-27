@@ -11,7 +11,7 @@ def spectralRadiusApprox(xi):
 
 
 def itterationApprox(ksi):
-    return np.log(2 / EPS) / 2 * np.sqrt(ksi)
+    return np.log(2 / EPS) / (2 * np.sqrt(ksi))
 
 
 def omegaOpt(spec):
@@ -189,8 +189,8 @@ x_0 = 0
 x_n = 1
 y_0 = 0
 y_m = np.pi
-N = 5
-M = 15
+N = 15
+M = 45
 step_x = (x_n) / N
 step_y = (y_m) / M
 x_i = np.arange(x_0, x_n + step_x, step_x)
