@@ -2,7 +2,7 @@ import numpy as np
 from tabulate import tabulate
 
 np.set_printoptions(formatter={"all": lambda x: f"{x:.4f}"})  # Set the format
-EPS = 0.1
+EPS = 0.0001
 
 
 def calculate_lhu(u, x, y, hx, hy):
@@ -114,18 +114,18 @@ def f_matrix(x_i, y_i):
 
 # Коэффициенты первой системы
 def A_1(x, y, i, j, hx):
-    return (-1 * p(x[i] - (hx / 2), y[j])) / hx**2
+    return (p(x[i] - (hx / 2), y[j])) / hx**2
 
 
 def B_1(x, y, i, j, hx, tau):
     term1 = 2 / tau
     term2 = p(x[i] + (hx / 2), y[j]) / hx**2
     term3 = p(x[i] - (hx / 2), y[j]) / hx**2
-    return (term1 + term2 + term3) * (-1)
+    return term1 + term2 + term3
 
 
 def C_1(x, y, i, j, hx):
-    return (-1 * p(x[i] + (hx / 2), y[j])) / hx**2
+    return (p(x[i] + (hx / 2), y[j])) / hx**2
 
 
 def G_1(x, y, i, j, hy, tau, u):
@@ -133,12 +133,12 @@ def G_1(x, y, i, j, hy, tau, u):
     term2 = (q(x[i], y[j] + (hy / 2)) * (u[i][j + 1] - u[i][j])) / hy**2
     term3 = (q(x[i], y[j] - (hy / 2)) * (u[i][j] - u[i][j - 1])) / hy**2
     term4 = f(x[i], y[j])
-    return term1 + term2 - term3 + term4
+    return (term1 + term2 - term3 + term4) * (-1)
 
 
 # Коэффициенты второй системы
 def A_2(x, y, i, j, hy):
-    return (-1 * q(x[i], y[j] - (hy / 2))) / hy**2
+    return (q(x[i], y[j] - (hy / 2))) / hy**2
 
 
 def B_2(x, y, i, j, hy, tau):
@@ -149,7 +149,7 @@ def B_2(x, y, i, j, hy, tau):
 
 
 def C_2(x, y, i, j, hy):
-    return (-1 * q(x[i], y[j] + (hy / 2))) / hy**2
+    return (q(x[i], y[j] + (hy / 2))) / hy**2
 
 
 def G_2(x, y, i, j, hx, tau, u):
@@ -157,7 +157,7 @@ def G_2(x, y, i, j, hx, tau, u):
     term2 = (p(x[i] + (hx / 2), y[j]) * (u[i + 1][j] - u[i][j])) / hx**2
     term3 = (p(x[i] - (hx / 2), y[j]) * (u[i][j] - u[i - 1][j])) / hx**2
     term4 = f(x[i], y[j])
-    return term1 + term2 - term3 + term4
+    return (term1 + term2 - term3 + term4)*(-1)
 
 
 def alternatingDirectionMethod(x, y, hx, hy, tau):
@@ -169,20 +169,15 @@ def alternatingDirectionMethod(x, y, hx, hy, tau):
     arrayOfU_K = [U_0]
 
     while (
-        # k
-        # < 1
         (normOfMatrix(arrayOfU_K[k] - exact) / normOfMatrix(arrayOfU_K[0] - exact))
         > EPS
     ):
         u_half = np.zeros((len(x), len(y)))
         current_U = np.zeros((len(x), len(y)))
 
-        print(normOfMatrix(arrayOfU_K[k] - exact) / normOfMatrix(arrayOfU_K[0] - exact))
-
         for i in range(len(x)):  # Условие на крайних столбцах
             u_half[i][0] = mu(x[i], 0)
             u_half[i][len(y) - 1] = mu(x[i], y[len(y) - 1])
-        # np.savetxt("matrix.txt", u_half, fmt="%.08f", delimiter="\t")
 
         for j in range(1, len(y) - 1):
             term1 = np.zeros(len(x))
@@ -191,12 +186,12 @@ def alternatingDirectionMethod(x, y, hx, hy, tau):
             term4 = np.zeros(len(x))
 
             term1[0] = 0
-            term2[0] = 1
+            term2[0] = -1
             term3[0] = 0
             term4[0] = mu(0, y[j])
 
             term1[len(x) - 1] = 0
-            term2[len(x) - 1] = 1
+            term2[len(x) - 1] = -1
             term3[len(x) - 1] = 0
             term4[len(x) - 1] = mu(x[len(x) - 1], y[j])
             for i in range(1, len(x) - 1):
@@ -204,16 +199,10 @@ def alternatingDirectionMethod(x, y, hx, hy, tau):
                 term2[i] = B_1(x, y, i, j, hx, tau)
                 term3[i] = C_1(x, y, i, j, hx)
                 term4[i] = G_1(x, y, i, j, hy, tau, arrayOfU_K[k])
-                # print(term1)
-                # print(term2)
-                # print(term3)
             linear_solve = tridiagonal_matrix_algorithm(term1, term2, term3, term4)
-            # print(linear_solve)
-            print()
             for i in range(0, len(x)):
                 u_half[i][j] = linear_solve[i]
             # Построили половинный шаг
-        # print(u_half)
 
         for j in range(len(y)):
             current_U[0][j] = mu(0, y[j])
@@ -226,12 +215,12 @@ def alternatingDirectionMethod(x, y, hx, hy, tau):
             lterm4 = np.zeros(len(y))
 
             lterm1[0] = 0
-            lterm2[0] = 1
+            lterm2[0] = -1
             lterm3[0] = 0
             lterm4[0] = mu(x[i], 0)
 
             lterm1[len(y) - 1] = 0
-            lterm2[len(y) - 1] = 1
+            lterm2[len(y) - 1] = -1
             lterm3[len(y) - 1] = 0
             lterm4[len(y) - 1] = mu(x[i], y[len(y) - 1])
 
@@ -245,11 +234,8 @@ def alternatingDirectionMethod(x, y, hx, hy, tau):
             for j in range(0, len(y)):
                 current_U[i][j] = linear_solve2[j]
             # Построили k+1 решение
-            # np.savetxt("matrix.txt", current_U, fmt="%.08f", delimiter="\t")
-        # print(current_U)
         arrayOfU_K.append(np.copy(current_U))
         k += 1
-        print(k)
     return arrayOfU_K
 
 
@@ -306,53 +292,52 @@ exact_solution_table = tabulate(exact_solve, tablefmt="fancy_grid")
 
 array_triangle = alternatingDirectionMethod(x_i, y_i, step_x, step_y, tauOpt)
 
-np.savetxt("ex.txt", exact_solve, fmt="%.08f", delimiter="\t")
-# U_0_111 = fillBorderMatrix(x_i, y_i)
-# null_approx = normOfMatrix(calculate_lhu(U_0, x_i, y_i, step_x, step_y) + f_h)
+U_0 = fillBorderMatrix(x_i, y_i)
+null_approx = normOfMatrix(calculate_lhu(U_0, x_i, y_i, step_x, step_y) + f_h)
 
 
-# data = []
-# headers = [
-#     "k",
-#     "||F-AU_k||",
-#     "rel.d",
-#     "||U^k - U_*||",
-#     "rel.error",
-#     "||U^k - U^(k-1)||",
-#     # "apost.est",
-#     "sp.red._k",
-# ]
+data = []
+headers = [
+    "k",
+    "||F-AU_k||",
+    "rel.d",
+    "||U^k - U_*||",
+    "rel.error",
+    "||U^k - U^(k-1)||",
+    # "apost.est",
+    "sp.red._k",
+]
 
-# for k, solve in enumerate(array_triangle):
-#     data.append(
-#         [
-#             k,
-#             normOfMatrix(calculate_lhu(solve, x_i, y_i, step_x, step_y) + f_h),
-#             normOfMatrix(calculate_lhu(solve, x_i, y_i, step_x, step_y) + f_h)
-#             / null_approx,
-#             normOfMatrix(solve - exact_solve),
-#             normOfMatrix(solve - exact_solve) / normOfMatrix(U_0 - exact_solve),
-#             normOfMatrix(solve - array_triangle[k - 1]),
-#             # (spectr * normOfMatrix(solve - array_triangle[k - 1])) / (1 - spectr),
-#             normOfMatrix(solve - array_triangle[k - 1])
-#             / normOfMatrix(array_triangle[k - 1] - array_triangle[k - 2]),
-#         ]
-#     )
+for k, solve in enumerate(array_triangle):
+    data.append(
+        [
+            k,
+            normOfMatrix(calculate_lhu(solve, x_i, y_i, step_x, step_y) + f_h),
+            normOfMatrix(calculate_lhu(solve, x_i, y_i, step_x, step_y) + f_h)
+            / null_approx,
+            normOfMatrix(solve - exact_solve),
+            normOfMatrix(solve - exact_solve) / normOfMatrix(U_0 - exact_solve),
+            normOfMatrix(solve - array_triangle[k - 1]),
+            # (spectr * normOfMatrix(solve - array_triangle[k - 1])) / (1 - spectr),
+            normOfMatrix(solve - array_triangle[k - 1])
+            / normOfMatrix(array_triangle[k - 1] - array_triangle[k - 2]),
+        ]
+    )
 
-# # Выведите таблицу
-# table1 = tabulate(data, headers, tablefmt="grid")
+# Выведите таблицу
+table1 = tabulate(data, headers, tablefmt="grid")
 
-# print(
-#     "\nПопеременно треугольный итерационный метод с чебышевскими параметрами. Вариант 8\n"
-# )
-# print(f"N = {N}; M = {M}\neps = {EPS}\n")
-# print(
-#     f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) + f_h)}"
-# )
-# print(f"Норма невязки нулевого приближения ||F-AU_0|| = {null_approx}")
-# # print(f"Число иттераций = {itterationApprox(eta)}")
+print(
+    "\nПопеременно треугольный итерационный метод с чебышевскими параметрами. Вариант 8\n"
+)
+print(f"N = {N}; M = {M}\neps = {EPS}\n")
+print(
+    f"Мера аппроксимации ||F-AU_*|| = {normOfMatrix(calculate_lhu(exact_solve, x_i, y_i, step_x, step_y) + f_h)}"
+)
+print(f"Норма невязки нулевого приближения ||F-AU_0|| = {null_approx}")
+# print(f"Число иттераций = {itterationApprox(eta)}")
 
-# # print(f"Спектральный радиус pho(H)= {spectr}")
-# print(table1)
-# # print(f"\nПриближенное решение:\n{approx_solition_table}")
-# # print(f"\nТочное решение:\n{exact_solution_table}")
+# print(f"Спектральный радиус pho(H)= {spectr}")
+print(table1)
+# print(f"\nПриближенное решение:\n{approx_solition_table}")
+# print(f"\nТочное решение:\n{exact_solution_table}")
