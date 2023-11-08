@@ -17,62 +17,55 @@ def calculate_lhu(u, x, y, hx, hy):
     return lhu
 
 
-def tridiagonal_matrix_algorithm(a, b, c, d):
-    n = len(b)
-    alpha = [0] * n
-    beta = [0] * n
-    x = [0] * n
-
-    # Прямой ход (forward pass)
-    alpha[0] = b[0]
-    beta[0] = d[0] / alpha[0]
-
+def tridiagonal_matrix_algorithm(A, B, C, G):
+    n = len(A)
+    s = np.zeros(n)
+    t = np.zeros(n)
+    y = np.zeros(n)
+    s[0] = C[0] / B[0]
+    t[0] = (-1 * G[0]) / B[0]
     for i in range(1, n):
-        alpha[i] = b[i] - a[i] * c[i - 1] / alpha[i - 1]
-        beta[i] = (d[i] - a[i] * beta[i - 1]) / alpha[i]
-
-    # Обратный ход (backward pass)
-    x[n - 1] = beta[n - 1]
-
+        s[i] = C[i] / (B[i] - (A[i] * s[i - 1]))
+        t[i] = ((A[i] * t[i - 1]) - G[i]) / (B[i] - (A[i] * s[i - 1]))
+    y[n - 1] = t[n - 1]
     for i in range(n - 2, -1, -1):
-        x[i] = beta[i] - c[i] * x[i + 1] / alpha[i]
-
-    return x
+        y[i] = (s[i] * y[i + 1]) + t[i]
+    return y
 
 
 def q(x, y):
     return 1
 
 
-# def p(x, y):
-#     return 1 + 2 * x
-
-
-# def f(x, y):
-#     return -1 * (
-#         2 * y**2
-#         + 2 * y**3
-#         + 8 * x * y**2
-#         + 8 * x * y**3
-#         + 2 * x**2
-#         + 6 * x**2 * y
-#     )
-
-
-# def mu(x, y):
-#     return x**2 * y**2 + x**2 * y**3
-
-
 def p(x, y):
-    return 3 * x + 2
+    return 1 + 2 * x
 
 
 def f(x, y):
-    return -1 * x**2 * (2 + 6 * y) - y**2 * (12 * x + 4) * (1 + y)
+    return -1 * (
+        2 * y**2
+        + 2 * y**3
+        + 8 * x * y**2
+        + 8 * x * y**3
+        + 2 * x**2
+        + 6 * x**2 * y
+    )
 
 
 def mu(x, y):
-    return x**2 * y**2 * (1 + y)
+    return x**2 * y**2 + x**2 * y**3
+
+
+# def p(x, y):
+#     return 3 * x + 2
+
+
+# def f(x, y):
+#     return -1 * x**2 * (2 + 6 * y) - y**2 * (12 * x + 4) * (1 + y)
+
+
+# def mu(x, y):
+#     return x**2 * y**2 * (1 + y)
 
 
 def fillBorderMatrix(x_i, y_i):
@@ -128,7 +121,7 @@ def B_1(x, y, i, j, hx, tau):
     term1 = 2 / tau
     term2 = p(x[i] + (hx / 2), y[j]) / hx**2
     term3 = p(x[i] - (hx / 2), y[j]) / hx**2
-    return term1 + term2 + term3
+    return (term1 + term2 + term3) * (-1)
 
 
 def C_1(x, y, i, j, hx):
@@ -176,10 +169,10 @@ def alternatingDirectionMethod(x, y, hx, hy, tau):
     arrayOfU_K = [U_0]
 
     while (
-        k
-        < 100
-        # (normOfMatrix(arrayOfU_K[k] - exact) / normOfMatrix(arrayOfU_K[0] - exact))
-        # > EPS
+        # k
+        # < 1
+        (normOfMatrix(arrayOfU_K[k] - exact) / normOfMatrix(arrayOfU_K[0] - exact))
+        > EPS
     ):
         u_half = np.zeros((len(x), len(y)))
         current_U = np.zeros((len(x), len(y)))
@@ -192,47 +185,68 @@ def alternatingDirectionMethod(x, y, hx, hy, tau):
         # np.savetxt("matrix.txt", u_half, fmt="%.08f", delimiter="\t")
 
         for j in range(1, len(y) - 1):
-            u_half[0][j] = mu(0, y[j])  # Условие на крайних строках
-            u_half[len(x) - 1][j] = mu(x[len(x) - 1], y[j])
+            term1 = np.zeros(len(x))
+            term2 = np.zeros(len(x))
+            term3 = np.zeros(len(x))
+            term4 = np.zeros(len(x))
 
-            term1 = []
-            term2 = []
-            term3 = []
-            term4 = []
+            term1[0] = 0
+            term2[0] = 1
+            term3[0] = 0
+            term4[0] = mu(0, y[j])
+
+            term1[len(x) - 1] = 0
+            term2[len(x) - 1] = 1
+            term3[len(x) - 1] = 0
+            term4[len(x) - 1] = mu(x[len(x) - 1], y[j])
             for i in range(1, len(x) - 1):
-                term1.append(A_1(x, y, i, j, hx))
-                term2.append(B_1(x, y, i, j, hx, tau))
-                term3.append(C_1(x, y, i, j, hx))
-                term4.append(G_1(x, y, i, j, hy, tau, arrayOfU_K[k]))
+                term1[i] = A_1(x, y, i, j, hx)
+                term2[i] = B_1(x, y, i, j, hx, tau)
+                term3[i] = C_1(x, y, i, j, hx)
+                term4[i] = G_1(x, y, i, j, hy, tau, arrayOfU_K[k])
+                # print(term1)
+                # print(term2)
+                # print(term3)
             linear_solve = tridiagonal_matrix_algorithm(term1, term2, term3, term4)
-            for i in range(1, len(x) - 1):
-                u_half[i][j] = linear_solve[i - 1]
+            # print(linear_solve)
+            print()
+            for i in range(0, len(x)):
+                u_half[i][j] = linear_solve[i]
             # Построили половинный шаг
+        # print(u_half)
 
         for j in range(len(y)):
             current_U[0][j] = mu(0, y[j])
             current_U[len(x) - 1][j] = mu(x[len(x) - 1], y[j])
 
         for i in range(1, len(x) - 1):
-            current_U[i][0] = mu(x[i], 0)
-            current_U[i][len(y) - 1] = mu(x[i], y[len(y) - 1])
+            lterm1 = np.zeros(len(y))
+            lterm2 = np.zeros(len(y))
+            lterm3 = np.zeros(len(y))
+            lterm4 = np.zeros(len(y))
 
-            lterm1 = []
-            lterm2 = []
-            lterm3 = []
-            lterm4 = []
+            lterm1[0] = 0
+            lterm2[0] = 1
+            lterm3[0] = 0
+            lterm4[0] = mu(x[i], 0)
+
+            lterm1[len(y) - 1] = 0
+            lterm2[len(y) - 1] = 1
+            lterm3[len(y) - 1] = 0
+            lterm4[len(y) - 1] = mu(x[i], y[len(y) - 1])
+
             for j in range(1, len(y) - 1):
-                lterm1.append(A_2(x, y, i, j, hy))
-                lterm2.append(B_2(x, y, i, j, hy, tau))
-                lterm3.append(C_2(x, y, i, j, hy))
-                lterm4.append(G_2(x, y, i, j, hx, tau, u_half))
+                lterm1[j] = A_2(x, y, i, j, hy)
+                lterm2[j] = B_2(x, y, i, j, hy, tau)
+                lterm3[j] = C_2(x, y, i, j, hy)
+                lterm4[j] = G_2(x, y, i, j, hx, tau, u_half)
             linear_solve2 = tridiagonal_matrix_algorithm(lterm1, lterm2, lterm3, lterm4)
 
-            for j in range(1, len(y) - 1):
-                current_U[i][j] = linear_solve2[j - 1]
-                # Построили k+1 решение
+            for j in range(0, len(y)):
+                current_U[i][j] = linear_solve2[j]
+            # Построили k+1 решение
             # np.savetxt("matrix.txt", current_U, fmt="%.08f", delimiter="\t")
-
+        # print(current_U)
         arrayOfU_K.append(np.copy(current_U))
         k += 1
         print(k)
@@ -243,8 +257,8 @@ x_0 = 0
 x_n = 1
 
 y_0 = 0
-# y_m = np.pi
-y_m = 1
+y_m = np.pi
+# y_m = 1
 
 N = 5
 M = 15
@@ -255,10 +269,10 @@ step_y = (y_m) / M
 x_i = np.arange(x_0, x_n + step_x, step_x)
 y_i = np.arange(y_0, y_m + step_y, step_y)
 
-# c1 = 1
-# c2 = 3
-c1 = 2
-c2 = 5
+c1 = 1
+c2 = 3
+# c1 = 2
+# c2 = 5
 
 d1 = 1
 d2 = 1
